@@ -1,6 +1,6 @@
-def main():
-    print("Hello from library-api!")
+from fastapi import FastAPI
+from api.books import router as books_router
 
+app = FastAPI()
 
-if __name__ == "__main__":
-    main()
+app.include_router(books_router)
