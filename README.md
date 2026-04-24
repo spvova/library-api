@@ -6,8 +6,8 @@
 
 ### Ендпоінти
 
-1. **GET /books** - Отримання всіх книг з фільтрацією та пагінацією
-   - Параметри: `status`, `author`, `sort_by` (title|year), `sort_order` (asc|desc), `limit`, `offset`
+1. **GET /books** - Отримання всіх книг з фільтрацією та курсорною пагінацією
+   - Параметри: `status`, `author`, `sort_by` (title|year), `sort_order` (asc|desc), `cursor` (ID книги), `limit`
    - Статус: 200 OK
 
 2. **GET /books/{book_id}** - Отримання книги по ID
@@ -121,7 +121,11 @@ curl "http://localhost:8000/books?status=available"
 ### Пагінація
 
 ```bash
-curl "http://localhost:8000/books?limit=5&offset=10"
+# Перша сторінка
+curl "http://localhost:8000/books?limit=5"
+
+# Наступна сторінка (cursor - ID останньої книги з попередньої сторінки)
+curl "http://localhost:8000/books?cursor=123e4567-e89b-12d3-a456-426614174000&limit=5"
 ```
 
 ### Сортування

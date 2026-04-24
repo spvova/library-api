@@ -4,8 +4,8 @@ class BookService:
     def __init__(self, repo: BookRepository):
         self.repo = repo
 
-    async def get_books(self, status=None, author=None, sort_by=None, sort_order='asc', limit=10, offset=0):
-        return await self.repo.get_books(status, author, sort_by, sort_order, limit, offset)
+    async def get_books(self, status=None, author=None, sort_by=None, sort_order='asc', cursor=None, limit=10):
+        return await self.repo.get_books(status, author, sort_by, sort_order, cursor, limit)
 
     async def get_book_by_id(self, book_id):
         return await self.repo.get_book_by_id(book_id)

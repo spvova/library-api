@@ -15,13 +15,13 @@ async def get_books(
     author: Optional[str] = Query(None, description="Filter by author"),
     sort_by: Optional[str] = Query(None, pattern="^(title|year)$", description="Sort by title or year"),
     sort_order: str = Query('asc', pattern="^(asc|desc)$", description="Sort order: asc or desc"),
+    cursor: Optional[str] = Query(None, description="Cursor for pagination (book ID)"),
     limit: int = Query(10, ge=1, le=100, description="Number of books to return"),
-    offset: int = Query(0, ge=0, description="Number of books to skip"),
     db: AsyncSession = Depends(get_db)
 ):
     repo = BookRepository(db)
     service = BookService(repo)
-    books = await service.get_books(status=status, author=author, sort_by=sort_by, sort_order=sort_order, limit=limit, offset=offset)
+    books = await service.get_books(status=status, author=author, sort_by=sort_by, sort_order=sort_order, cursor=cursor, limit=limit)
     return books
 
 @router.get("/{book_id}", response_model=Book)

@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from typing import List, Optional, Union
+from uuid import UUID
 from models.book_model import Book, BookStatus
 
 class BookRepository:
@@ -13,8 +14,8 @@ class BookRepository:
         author: Optional[str] = None,
         sort_by: Optional[str] = None,
         sort_order: str = 'asc',
-        limit: int = 10,
-        offset: int = 0
+        cursor: Optional[str] = None,
+        limit: int = 10
     ) -> List[Book]:
         query = select(Book)
         
@@ -26,6 +27,14 @@ class BookRepository:
         if author:
             query = query.where(Book.author == author)
         
+        if cursor:
+            # Convert cursor to UUID
+            try:
+                cursor_uuid = UUID(cursor)
+                query = query.where(Book.id > cursor_uuid)
+            except (ValueError, TypeError):
+                pass  # Invalid cursor, ignore
+        
         if sort_by:
             if sort_by == 'title':
                 order = Book.title.asc() if sort_order == 'asc' else Book.title.desc()
@@ -35,8 +44,11 @@ class BookRepository:
                 order = None
             if order is not None:
                 query = query.order_by(order)
+        else:
+            # For cursor pagination, default sort by id
+            query = query.order_by(Book.id.asc())
         
-        query = query.limit(limit).offset(offset)
+        query = query.limit(limit)
         result = await self.session.execute(query)
         return result.scalars().all()
 

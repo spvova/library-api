@@ -162,25 +162,29 @@ async def test_sort_by_title(service):
 
 @pytest.mark.asyncio
 async def test_pagination(service):
-    """Test pagination with limit and offset"""
+    """Test cursor-based pagination"""
+    # Add 15 books
+    books_added = []
     for i in range(15):
-        await service.add_book({
+        book = await service.add_book({
             'title': f'Book {i+1}',
             'author': f'Author {i+1}',
             'status': BookStatus.AVAILABLE,
             'year': 2020 + i
         })
+        books_added.append(book)
     
-    # Get first page
-    page1 = await service.get_books(limit=5, offset=0)
+    # Get first page (limit=5)
+    page1 = await service.get_books(limit=5)
     assert len(page1) == 5
     
-    # Get second page
-    page2 = await service.get_books(limit=5, offset=5)
+    # Get second page using cursor (last id from page1)
+    last_id_page1 = str(page1[-1].id)
+    page2 = await service.get_books(cursor=last_id_page1, limit=5)
     assert len(page2) == 5
     
     # Ensure pages don't overlap
-    assert page1[0].id != page2[0].id
+    assert page1[-1].id != page2[0].id
 
 @pytest.mark.asyncio
 async def test_filter_by_status(service):
