@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from models.book_model import BookStatus
 
@@ -11,3 +11,8 @@ class BookBase(BaseModel):
 
 class BookCreate(BookBase):
     pass
+
+class Book(BookBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str

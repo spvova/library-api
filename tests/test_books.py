@@ -1,59 +1,199 @@
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+from models.book_model import Base, BookStatus
 from services.book_service import BookService
-from repository.book_repository import books
+from repository.book_repository import BookRepository
 
-@pytest.fixture(autouse=True)
-def clear_books():
-    books.clear()
+@pytest.fixture(scope="function")
+async def engine():
+    """Create an in-memory SQLite database for testing"""
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        echo=False,
+        connect_args={"check_same_thread": False}
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield engine
+    await engine.dispose()
 
-def test_add_book():
-    service = BookService()
-    book_data = {'title': 'Test Book', 'author': 'Test Author', 'status': 'available', 'year': 2020}
-    book = service.add_book(book_data)
+@pytest.fixture
+async def session(engine):
+    """Create a new database session for a test"""
+    async_session = sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False
+    )
+    async with async_session() as session:
+        yield session
+
+@pytest.fixture
+async def service(session):
+    """Create a service with a test repository"""
+    repo = BookRepository(session)
+    return BookService(repo)
+
+@pytest.mark.asyncio
+async def test_add_book(service):
+    """Test adding a new book"""
+    book_data = {
+        'title': 'Test Book',
+        'author': 'Test Author',
+        'status': BookStatus.AVAILABLE,
+        'year': 2020
+    }
+    book = await service.add_book(book_data)
     assert book.title == 'Test Book'
     assert book.author == 'Test Author'
-    assert book.status == 'available'
+    assert book.status == BookStatus.AVAILABLE
     assert book.year == 2020
     assert book.id is not None
 
-def test_get_books():
-    service = BookService()
-    service.add_book({'title': 'Book1', 'author': 'Author1', 'status': 'available', 'year': 2020})
-    service.add_book({'title': 'Book2', 'author': 'Author2', 'status': 'issued', 'year': 2021})
-    books = service.get_books()
+@pytest.mark.asyncio
+async def test_get_books(service):
+    """Test retrieving all books"""
+    await service.add_book({
+        'title': 'Book1',
+        'author': 'Author1',
+        'status': BookStatus.AVAILABLE,
+        'year': 2020
+    })
+    await service.add_book({
+        'title': 'Book2',
+        'author': 'Author2',
+        'status': BookStatus.ISSUED,
+        'year': 2021
+    })
+    books = await service.get_books()
     assert len(books) == 2
 
-def test_get_book_by_id():
-    service = BookService()
-    book = service.add_book({'title': 'Book1', 'author': 'Author1', 'status': 'available', 'year': 2020})
-    retrieved = service.get_book_by_id(str(book.id))
-    assert retrieved == book
+@pytest.mark.asyncio
+async def test_get_book_by_id(service):
+    """Test retrieving a book by ID"""
+    book = await service.add_book({
+        'title': 'Book1',
+        'author': 'Author1',
+        'status': BookStatus.AVAILABLE,
+        'year': 2020
+    })
+    retrieved = await service.get_book_by_id(str(book.id))
+    assert retrieved is not None
+    assert retrieved.id == book.id
+    assert retrieved.title == 'Book1'
 
-def test_delete_book():
-    service = BookService()
-    book = service.add_book({'title': 'Book1', 'author': 'Author1', 'status': 'available', 'year': 2020})
-    deleted = service.delete_book(str(book.id))
-    assert deleted == True
-    books = service.get_books()
+@pytest.mark.asyncio
+async def test_delete_book(service):
+    """Test deleting a book"""
+    book = await service.add_book({
+        'title': 'Book1',
+        'author': 'Author1',
+        'status': BookStatus.AVAILABLE,
+        'year': 2020
+    })
+    deleted = await service.delete_book(str(book.id))
+    assert deleted is True
+    books = await service.get_books()
     assert len(books) == 0
 
-def test_delete_nonexistent_book():
-    service = BookService()
-    deleted = service.delete_book('nonexistent')
-    assert deleted == False
+@pytest.mark.asyncio
+async def test_delete_nonexistent_book(service):
+    """Test deleting a non-existent book returns False"""
+    deleted = await service.delete_book('nonexistent-id')
+    assert deleted is False
 
-def test_filter_by_status():
-    service = BookService()
-    service.add_book({'title': 'Book1', 'author': 'Author1', 'status': 'available', 'year': 2020})
-    service.add_book({'title': 'Book2', 'author': 'Author2', 'status': 'issued', 'year': 2021})
-    available = service.get_books(status='available')
+@pytest.mark.asyncio
+async def test_filter_by_status(service):
+    """Test filtering books by status"""
+    await service.add_book({
+        'title': 'Book1',
+        'author': 'Author1',
+        'status': BookStatus.AVAILABLE,
+        'year': 2020
+    })
+    await service.add_book({
+        'title': 'Book2',
+        'author': 'Author2',
+        'status': BookStatus.ISSUED,
+        'year': 2021
+    })
+    available = await service.get_books(status=BookStatus.AVAILABLE)
+    assert len(available) == 1
+    assert available[0].status == BookStatus.AVAILABLE
+
+@pytest.mark.asyncio
+async def test_filter_by_author(service):
+    """Test filtering books by author"""
+    await service.add_book({
+        'title': 'Book1',
+        'author': 'Author1',
+        'status': BookStatus.AVAILABLE,
+        'year': 2020
+    })
+    await service.add_book({
+        'title': 'Book2',
+        'author': 'Author2',
+        'status': BookStatus.AVAILABLE,
+        'year': 2021
+    })
+    books = await service.get_books(author='Author1')
+    assert len(books) == 1
+    assert books[0].author == 'Author1'
+
+@pytest.mark.asyncio
+async def test_sort_by_title(service):
+    """Test sorting books by title"""
+    await service.add_book({
+        'title': 'B Book',
+        'author': 'Author1',
+        'status': BookStatus.AVAILABLE,
+        'year': 2020
+    })
+    await service.add_book({
+        'title': 'A Book',
+        'author': 'Author2',
+        'status': BookStatus.AVAILABLE,
+        'year': 2021
+    })
+    sorted_books = await service.get_books(sort_by='title', sort_order='asc')
+    assert sorted_books[0].title == 'A Book'
+    assert sorted_books[1].title == 'B Book'
+
+@pytest.mark.asyncio
+async def test_pagination(service):
+    """Test pagination with limit and offset"""
+    for i in range(15):
+        await service.add_book({
+            'title': f'Book {i+1}',
+            'author': f'Author {i+1}',
+            'status': BookStatus.AVAILABLE,
+            'year': 2020 + i
+        })
+    
+    # Get first page
+    page1 = await service.get_books(limit=5, offset=0)
+    assert len(page1) == 5
+    
+    # Get second page
+    page2 = await service.get_books(limit=5, offset=5)
+    assert len(page2) == 5
+    
+    # Ensure pages don't overlap
+    assert page1[0].id != page2[0].id
+
+@pytest.mark.asyncio
+async def test_filter_by_status(service):
+    await service.add_book({'title': 'Book1', 'author': 'Author1', 'status': 'available', 'year': 2020})
+    await service.add_book({'title': 'Book2', 'author': 'Author2', 'status': 'issued', 'year': 2021})
+    available = await service.get_books(status='available')
     assert len(available) == 1
     assert available[0].status == 'available'
 
-def test_sort_by_title():
-    service = BookService()
-    service.add_book({'title': 'B Book', 'author': 'Author1', 'status': 'available', 'year': 2020})
-    service.add_book({'title': 'A Book', 'author': 'Author2', 'status': 'available', 'year': 2021})
-    sorted_books = service.get_books(sort_by='title', sort_order='asc')
+@pytest.mark.asyncio
+async def test_sort_by_title(service):
+    await service.add_book({'title': 'B Book', 'author': 'Author1', 'status': 'available', 'year': 2020})
+    await service.add_book({'title': 'A Book', 'author': 'Author2', 'status': 'available', 'year': 2021})
+    sorted_books = await service.get_books(sort_by='title', sort_order='asc')
     assert sorted_books[0].title == 'A Book'
     assert sorted_books[1].title == 'B Book'

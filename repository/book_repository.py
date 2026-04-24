@@ -1,40 +1,63 @@
-from typing import List, Optional
-from uuid import uuid4
-from models.book_model import Book
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
+from typing import List, Optional, Union
+from models.book_model import Book, BookStatus
 
-books: List[Book] = []
+class BookRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
 
-def get_all_books() -> List[Book]:
-    return books.copy()
+    async def get_books(
+        self,
+        status: Optional[Union[str, BookStatus]] = None,
+        author: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        sort_order: str = 'asc',
+        limit: int = 10,
+        offset: int = 0
+    ) -> List[Book]:
+        query = select(Book)
+        
+        if status:
+            if isinstance(status, str):
+                status = BookStatus(status)
+            query = query.where(Book.status == status)
+        
+        if author:
+            query = query.where(Book.author == author)
+        
+        if sort_by:
+            if sort_by == 'title':
+                order = Book.title.asc() if sort_order == 'asc' else Book.title.desc()
+            elif sort_by == 'year':
+                order = Book.year.asc() if sort_order == 'asc' else Book.year.desc()
+            else:
+                order = None
+            if order is not None:
+                query = query.order_by(order)
+        
+        query = query.limit(limit).offset(offset)
+        result = await self.session.execute(query)
+        return result.scalars().all()
 
-def get_book_by_id(book_id: str) -> Optional[Book]:
-    for book in books:
-        if str(book.id) == book_id:
-            return book
-    return None
+    async def get_book_by_id(self, book_id: str) -> Optional[Book]:
+        query = select(Book).where(Book.id == book_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
 
-def add_book(book_data: dict) -> Book:
-    book = Book(id=uuid4(), **book_data)
-    books.append(book)
-    return book
+    async def add_book(self, book_data: dict) -> Book:
+        # Convert string status to enum if needed
+        if 'status' in book_data and isinstance(book_data['status'], str):
+            book_data['status'] = BookStatus(book_data['status'])
+        
+        book = Book(**book_data)
+        self.session.add(book)
+        await self.session.commit()
+        await self.session.refresh(book)
+        return book
 
-def delete_book(book_id: str) -> bool:
-    for i, book in enumerate(books):
-        if str(book.id) == book_id:
-            books.pop(i)
-            return True
-    return False
-
-def get_books_filtered(status: Optional[str] = None, author: Optional[str] = None, sort_by: Optional[str] = None, sort_order: str = 'asc') -> List[Book]:
-    filtered = books[:]
-    if status:
-        filtered = [b for b in filtered if b.status.value == status]
-    if author:
-        filtered = [b for b in filtered if b.author == author]
-    if sort_by:
-        reverse = sort_order == 'desc'
-        if sort_by == 'title':
-            filtered.sort(key=lambda b: b.title, reverse=reverse)
-        elif sort_by == 'year':
-            filtered.sort(key=lambda b: b.year, reverse=reverse)
-    return filtered
+    async def delete_book(self, book_id: str) -> bool:
+        query = delete(Book).where(Book.id == book_id)
+        result = await self.session.execute(query)
+        await self.session.commit()
+        return result.rowcount > 0
