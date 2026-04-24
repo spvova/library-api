@@ -1,16 +1,20 @@
 [project]
 name = "library-api"
 version = "0.1.0"
-description = "Library API with FastAPI and MongoDB"
+description = "Library API with Flask and MongoDB"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.136.1",
+    "flask>=3.0.0",
+    "flask-restful>=0.3.10",
+    "flasgger>=0.9.7.1",
     "pydantic>=2.13.3",
-    "uvicorn[standard]>=0.46.0",
-    "motor>=4.4.0",
+    "motor>=3.7.0",
     "pydantic-mongo>=0.3.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["api*", "models*", "repository*", "schemas*", "services*", "tests*"]
 
 [project.optional-dependencies]
 dev = [
