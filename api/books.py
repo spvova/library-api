@@ -1,6 +1,7 @@
 from flask_restful import Resource, reqparse
 from flask import request
 from flasgger import swag_from
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from schemas.book import BookCreate, Book
 from services.book_service import BookService
 from repository.book_repository import BookRepository
@@ -18,8 +19,10 @@ class BooksResource(Resource):
         self.parser.add_argument('offset', type=int, location='args', default=0, help='Offset for pagination')
         self.parser.add_argument('limit', type=int, location='args', default=10, help='Number of books to return (1-100)')
 
+    @jwt_required()
     @swag_from({
         'tags': ['Books'],
+        'security': [{'Bearer': []}],
         'parameters': [
             {
                 'name': 'status',
@@ -101,8 +104,10 @@ class BooksResource(Resource):
         )
         return [book.model_dump() for book in books], 200
 
+    @jwt_required()
     @swag_from({
         'tags': ['Books'],
+        'security': [{'Bearer': []}],
         'parameters': [
             {
                 'name': 'book',
@@ -145,8 +150,10 @@ class BooksResource(Resource):
 
 
 class BookResource(Resource):
+    @jwt_required()
     @swag_from({
         'tags': ['Books'],
+        'security': [{'Bearer': []}],
         'parameters': [
             {
                 'name': 'book_id',
@@ -184,8 +191,10 @@ class BookResource(Resource):
             return {'message': 'Book not found'}, 404
         return book.model_dump(), 200
 
+    @jwt_required()
     @swag_from({
         'tags': ['Books'],
+        'security': [{'Bearer': []}],
         'parameters': [
             {
                 'name': 'book_id',
