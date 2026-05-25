@@ -67,7 +67,7 @@ async def test_get_books(service):
         'year': 2021
     })
     books = await service.get_books()
-    assert len(books) == 2
+    assert len(books['items']) == 2
 
 @pytest.mark.asyncio
 async def test_get_book_by_id(service):
@@ -95,7 +95,7 @@ async def test_delete_book(service):
     deleted = await service.delete_book(str(book.id))
     assert deleted is True
     books = await service.get_books()
-    assert len(books) == 0
+    assert len(books['items']) == 0
 
 @pytest.mark.asyncio
 async def test_delete_nonexistent_book(service):
@@ -119,8 +119,8 @@ async def test_filter_by_status(service):
         'year': 2021
     })
     available = await service.get_books(status=BookStatus.AVAILABLE)
-    assert len(available) == 1
-    assert available[0].status == BookStatus.AVAILABLE
+    assert len(available['items']) == 1
+    assert available['items'][0].status == BookStatus.AVAILABLE
 
 @pytest.mark.asyncio
 async def test_filter_by_author(service):
@@ -138,8 +138,8 @@ async def test_filter_by_author(service):
         'year': 2021
     })
     books = await service.get_books(author='Author1')
-    assert len(books) == 1
-    assert books[0].author == 'Author1'
+    assert len(books['items']) == 1
+    assert books['items'][0].author == 'Author1'
 
 @pytest.mark.asyncio
 async def test_sort_by_title(service):
@@ -157,12 +157,12 @@ async def test_sort_by_title(service):
         'year': 2021
     })
     sorted_books = await service.get_books(sort_by='title', sort_order='asc')
-    assert sorted_books[0].title == 'A Book'
-    assert sorted_books[1].title == 'B Book'
+    assert sorted_books['items'][0].title == 'A Book'
+    assert sorted_books['items'][1].title == 'B Book'
 
 @pytest.mark.asyncio
 async def test_pagination(service):
-    """Test pagination with limit and offset"""
+    """Test pagination with cursor"""
     for i in range(15):
         await service.add_book({
             'title': f'Book {i+1}',
@@ -171,29 +171,27 @@ async def test_pagination(service):
             'year': 2020 + i
         })
     
-    # Get first page
-    page1 = await service.get_books(limit=5, offset=0)
-    assert len(page1) == 5
-    
-    # Get second page
-    page2 = await service.get_books(limit=5, offset=5)
-    assert len(page2) == 5
-    
-    # Ensure pages don't overlap
-    assert page1[0].id != page2[0].id
+    page1 = await service.get_books(limit=5)
+    assert len(page1['items']) == 5
+    assert page1['next_cursor'] is not None
+
+    page2 = await service.get_books(cursor=page1['next_cursor'], limit=5)
+    assert len(page2['items']) == 5
+    assert page2['next_cursor'] is not None
+    assert page1['items'][0].id != page2['items'][0].id
 
 @pytest.mark.asyncio
-async def test_filter_by_status(service):
+async def test_filter_by_status_str(service):
     await service.add_book({'title': 'Book1', 'author': 'Author1', 'status': 'available', 'year': 2020})
     await service.add_book({'title': 'Book2', 'author': 'Author2', 'status': 'issued', 'year': 2021})
     available = await service.get_books(status='available')
-    assert len(available) == 1
-    assert available[0].status == 'available'
+    assert len(available['items']) == 1
+    assert available['items'][0].status == 'available'
 
 @pytest.mark.asyncio
-async def test_sort_by_title(service):
+async def test_sort_by_title_str(service):
     await service.add_book({'title': 'B Book', 'author': 'Author1', 'status': 'available', 'year': 2020})
     await service.add_book({'title': 'A Book', 'author': 'Author2', 'status': 'available', 'year': 2021})
     sorted_books = await service.get_books(sort_by='title', sort_order='asc')
-    assert sorted_books[0].title == 'A Book'
-    assert sorted_books[1].title == 'B Book'
+    assert sorted_books['items'][0].title == 'A Book'
+    assert sorted_books['items'][1].title == 'B Book'

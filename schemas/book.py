@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import List, Optional
 from models.book_model import BookStatus
 
 class BookBase(BaseModel):
@@ -16,3 +16,7 @@ class Book(BookBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+
+class BookListResponse(BaseModel):
+    items: List[Book]
+    next_cursor: Optional[str] = None

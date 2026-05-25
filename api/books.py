@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
-from schemas.book import BookCreate, Book
+from schemas.book import BookCreate, Book, BookListResponse
 from models.book_model import Book as BookModel
 from services.book_service import BookService
 from repository.book_repository import BookRepository
@@ -9,19 +9,19 @@ from database import get_db
 
 router = APIRouter()
 
-@router.get("/", response_model=List[Book])
+@router.get("/", response_model=BookListResponse)
 async def get_books(
     status: Optional[str] = Query(None, description="Filter by status: available or issued"),
     author: Optional[str] = Query(None, description="Filter by author"),
     sort_by: Optional[str] = Query(None, pattern="^(title|year)$", description="Sort by title or year"),
     sort_order: str = Query('asc', pattern="^(asc|desc)$", description="Sort order: asc or desc"),
+    cursor: Optional[str] = Query(None, description="Cursor for pagination"),
     limit: int = Query(10, ge=1, le=100, description="Number of books to return"),
-    offset: int = Query(0, ge=0, description="Number of books to skip"),
     db: AsyncSession = Depends(get_db)
 ):
     repo = BookRepository(db)
     service = BookService(repo)
-    books = await service.get_books(status=status, author=author, sort_by=sort_by, sort_order=sort_order, limit=limit, offset=offset)
+    books = await service.get_books(status=status, author=author, sort_by=sort_by, sort_order=sort_order, cursor=cursor, limit=limit)
     return books
 
 @router.get("/{book_id}", response_model=Book)

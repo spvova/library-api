@@ -1,5 +1,8 @@
+import base64
+import json
+
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, or_, and_
 from typing import List, Optional, Union
 from models.book_model import Book, BookStatus
 
@@ -13,32 +16,88 @@ class BookRepository:
         author: Optional[str] = None,
         sort_by: Optional[str] = None,
         sort_order: str = 'asc',
-        limit: int = 10,
-        offset: int = 0
-    ) -> List[Book]:
+        cursor: Optional[str] = None,
+        limit: int = 10
+    ) -> dict:
         query = select(Book)
-        
+
         if status:
             if isinstance(status, str):
                 status = BookStatus(status)
             query = query.where(Book.status == status)
-        
+
         if author:
             query = query.where(Book.author == author)
-        
-        if sort_by:
-            if sort_by == 'title':
-                order = Book.title.asc() if sort_order == 'asc' else Book.title.desc()
-            elif sort_by == 'year':
-                order = Book.year.asc() if sort_order == 'asc' else Book.year.desc()
-            else:
-                order = None
-            if order is not None:
-                query = query.order_by(order)
-        
-        query = query.limit(limit).offset(offset)
+
+        if sort_by == 'title':
+            sort_field = Book.title
+        elif sort_by == 'year':
+            sort_field = Book.year
+        else:
+            sort_field = Book.id
+
+        if cursor:
+            try:
+                decoded = json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
+                last_id = decoded.get('id')
+                last_value = decoded.get('value')
+            except Exception:
+                last_id = None
+                last_value = None
+
+            if last_id:
+                if sort_by == 'title':
+                    if sort_order == 'asc':
+                        condition = or_(
+                            Book.title > last_value,
+                            and_(Book.title == last_value, Book.id > last_id),
+                        )
+                    else:
+                        condition = or_(
+                            Book.title < last_value,
+                            and_(Book.title == last_value, Book.id < last_id),
+                        )
+                elif sort_by == 'year':
+                    if sort_order == 'asc':
+                        condition = or_(
+                            Book.year > last_value,
+                            and_(Book.year == last_value, Book.id > last_id),
+                        )
+                    else:
+                        condition = or_(
+                            Book.year < last_value,
+                            and_(Book.year == last_value, Book.id < last_id),
+                        )
+                else:
+                    condition = Book.id > last_id if sort_order == 'asc' else Book.id < last_id
+                query = query.where(condition)
+
+        if sort_order == 'asc':
+            order_by = [sort_field.asc(), Book.id.asc()] if sort_field is not Book.id else [Book.id.asc()]
+        else:
+            order_by = [sort_field.desc(), Book.id.desc()] if sort_field is not Book.id else [Book.id.desc()]
+
+        query = query.order_by(*order_by).limit(limit + 1)
         result = await self.session.execute(query)
-        return result.scalars().all()
+        rows = result.scalars().all()
+
+        has_next = len(rows) > limit
+        items = rows[:limit]
+
+        next_cursor = None
+        if has_next:
+            last_item = rows[limit - 1]
+            cursor_payload = {"id": last_item.id}
+            if sort_by == 'title':
+                cursor_payload["value"] = last_item.title
+            elif sort_by == 'year':
+                cursor_payload["value"] = last_item.year
+            next_cursor = base64.urlsafe_b64encode(json.dumps(cursor_payload).encode()).decode()
+
+        return {
+            'items': items,
+            'next_cursor': next_cursor,
+        }
 
     async def get_book_by_id(self, book_id: str) -> Optional[Book]:
         query = select(Book).where(Book.id == book_id)
