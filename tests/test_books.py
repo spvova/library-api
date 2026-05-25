@@ -1,38 +1,23 @@
+import os
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-from models.book_model import Base, BookStatus
+from motor.motor_asyncio import AsyncIOMotorClient
+from models.book_model import BookStatus
 from services.book_service import BookService
 from repository.book_repository import BookRepository
 
 @pytest.fixture(scope="function")
-async def engine():
-    """Create an in-memory SQLite database for testing"""
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        echo=False,
-        connect_args={"check_same_thread": False}
-    )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    await engine.dispose()
+async def db():
+    mongo_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+    db_name = os.getenv("MONGODB_DB", "library_test")
+    client = AsyncIOMotorClient(mongo_url)
+    database = client[db_name]
+    await database["books"].delete_many({})
+    yield database
+    client.close()
 
 @pytest.fixture
-async def session(engine):
-    """Create a new database session for a test"""
-    async_session = sessionmaker(
-        engine,
-        class_=AsyncSession,
-        expire_on_commit=False
-    )
-    async with async_session() as session:
-        yield session
-
-@pytest.fixture
-async def service(session):
-    """Create a service with a test repository"""
-    repo = BookRepository(session)
+async def service(db):
+    repo = BookRepository(db)
     return BookService(repo)
 
 @pytest.mark.asyncio

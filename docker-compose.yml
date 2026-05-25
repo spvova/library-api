@@ -4,26 +4,29 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://rest_lab2:rest_lab2@db:5432/rest_lab2
+      - MONGODB_URL=mongodb://mongo:27017
+      - MONGODB_DB=library
     depends_on:
-      db:
+      mongo:
         condition: service_healthy
 
-  db:
-    image: postgres:16-alpine  # Оновлено до 16 версії
+  mongo:
+    image: mongo:latest
+    restart: always
     environment:
-      - POSTGRES_USER=rest_lab2
-      - POSTGRES_PASSWORD=rest_lab2
-      - POSTGRES_DB=rest_lab2
-    ports:
-      - "5435:5432"
+      MONGO_INITDB_ROOT_USERNAME: mongo_admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: books
+    ports:  
+      - "27017:27017"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongo_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rest_lab2 -d rest_lab2"]
+      test: ["CMD-SHELL", "mongo --quiet --eval 'db.adminCommand(\"ping\")' || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
 volumes:
-  postgres_data:
+  mongo_data:
