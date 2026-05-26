@@ -48,7 +48,6 @@ async def get_books(
     sort_order: str = Query('asc', pattern="^(asc|desc)$", description="Sort order: asc or desc"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     limit: int = Query(10, ge=1, le=100, description="Number of books to return"),
-    current_user: str = Depends(verify_token_dependency),
     db = Depends(get_db)
 ):
     repo = BookRepository(db)
@@ -58,7 +57,7 @@ async def get_books(
 
 
 @router.get("/{book_id}", response_model=Book)
-async def get_book(book_id: str, current_user: str = Depends(verify_token_dependency), db = Depends(get_db)):
+async def get_book(book_id: str, db = Depends(get_db)):
     repo = BookRepository(db)
     service = BookService(repo)
     book = await service.get_book_by_id(book_id)
