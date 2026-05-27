@@ -42,27 +42,40 @@ async def verify_token_dependency(authorization: Optional[str] = Header(None)) -
 
 @router.get("/", response_model=BookListResponse)
 async def get_books(
-    status: Optional[str] = Query(None, description="Filter by status: available or issued"),
-    author: Optional[str] = Query(None, description="Filter by author"),
-    sort_by: Optional[str] = Query(None, pattern="^(title|year)$", description="Sort by title or year"),
-    sort_order: str = Query('asc', pattern="^(asc|desc)$", description="Sort order: asc or desc"),
-    offset: int = Query(0, ge=0, description="Offset for pagination"),
-    limit: int = Query(10, ge=1, le=100, description="Number of books to return"),
+    status: Optional[str] = Query(None),
+    author: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None, pattern="^(title|year)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100),
     db = Depends(get_db)
 ):
     repo = BookRepository(db)
     service = BookService(repo)
-    books = await service.get_books(status=status, author=author, sort_by=sort_by, sort_order=sort_order, offset=offset, limit=limit)
-    return books
+
+    return await service.get_books(
+        status=status,
+        author=author,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        offset=offset,
+        limit=limit
+    )
 
 
 @router.get("/{book_id}", response_model=Book)
-async def get_book(book_id: str, db = Depends(get_db)):
+async def get_book(
+    book_id: str,
+    db = Depends(get_db)
+):
     repo = BookRepository(db)
     service = BookService(repo)
+
     book = await service.get_book_by_id(book_id)
+
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
+
     return book
 
 
