@@ -62,9 +62,5 @@ swagger = Swagger(app, config=swagger_config, template={
 api.add_resource(BooksResource, '/books')
 api.add_resource(BookResource, '/books/<book_id>')
 
-@app.teardown_appcontext
-def shutdown_session(exception=None):
-    client.close()
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

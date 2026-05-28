@@ -11,6 +11,7 @@ dependencies = [
     "pydantic>=2.13.3",
     "motor>=3.7.0",
     "pydantic-mongo>=0.3.0",
+    "asgiref>=3.11.1",
 ]
 
 [tool.setuptools.packages.find]

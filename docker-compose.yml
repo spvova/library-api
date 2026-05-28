@@ -2,7 +2,7 @@ services:
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "8000:5000"
     environment:
       - MONGODB_URL=mongodb://mongo_admin:password@mongo_db:27017/?authSource=admin
       - MONGODB_DB=books
