@@ -1,4 +1,5 @@
 import time
+import uuid
 from typing import Tuple, Dict
 import os
 import redis.asyncio as redis
@@ -36,7 +37,9 @@ class RateLimiter:
                 "reset": WINDOW
             }
 
-        await self.redis.zadd(key, {str(now): now})
+        # ВИПРАВЛЕННЯ: Створюємо унікальний member для кожного запиту
+        unique_member = f"{now}:{uuid.uuid4()}"
+        await self.redis.zadd(key, {unique_member: now})
         await self.redis.expire(key, WINDOW)
 
         return True, {
@@ -44,7 +47,6 @@ class RateLimiter:
             "remaining": limit - (count + 1),
             "reset": WINDOW
         }
-
 
 limiter = RateLimiter(redis_client)
 

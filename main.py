@@ -139,12 +139,11 @@ def custom_openapi():
         }
     }
     
-    # Mark protected endpoints (POST, DELETE)
     for path, path_item in openapi_schema["paths"].items():
         for method, operation in path_item.items():
             if isinstance(operation, dict):
-                # Mark POST and DELETE as requiring bearer token
-                if method in ["post", "delete"] and "tags" in operation and "books" in operation["tags"]:
+                # Застосовуємо Bearer токен для всіх методів з тегом "books"
+                if "tags" in operation and "books" in operation["tags"]:
                     operation["security"] = [{"Bearer": []}]
     
     app.openapi_schema = openapi_schema
