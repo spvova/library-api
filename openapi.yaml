@@ -1,0 +1,336 @@
+openapi: 3.0.3 
+info: 
+  title: Library API 
+  description: A library management API with JWT authentication 
+  version: 1.0.0 
+servers: 
+  - url: http://localhost:8000 
+    description: Local development server 
+tags: 
+  - name: auth 
+  - name: books 
+  - name: health 
+paths: 
+  /health: 
+    get: 
+      tags: 
+        - health 
+      summary: Health check endpoint 
+      responses: 
+        '200': 
+          description: Successful Response 
+          content: 
+            application/json: 
+              schema: 
+                type: object 
+                properties: 
+                  status: 
+                    type: string 
+                    example: ok 
+ 
+  /auth/signup: 
+    post: 
+      tags: 
+        - auth 
+      summary: Register a new user account 
+      requestBody: 
+        required: true 
+        content: 
+          application/json: 
+            schema: 
+              $ref: '#/components/schemas/SignupRequest' 
+      responses: 
+        '200': 
+          description: User registered successfully 
+          content: 
+            application/json: 
+              schema: 
+                $ref: '#/components/schemas/SignupResponse' 
+        '400': 
+          description: Bad Request (e.g., username/password too short) 
+        '409': 
+          description: User already exists 
+ 
+  /auth/login: 
+    post: 
+      tags: 
+        - auth 
+      summary: Login endpoint to get access and refresh tokens 
+      requestBody: 
+        required: true 
+        content: 
+          application/x-www-form-urlencoded: 
+            schema: 
+              type: object 
+              properties: 
+                username: 
+                  type: string 
+                password: 
+                  type: string 
+              required: 
+                - username 
+                - password 
+      responses: 
+        '200': 
+          description: Successful login 
+          content: 
+            application/json: 
+              schema: 
+                $ref: '#/components/schemas/TokenResponse' 
+        '401': 
+          description: Invalid credentials 
+ 
+  /auth/refresh: 
+    post: 
+      tags: 
+        - auth 
+      summary: Refresh endpoint to get a new access token 
+      requestBody: 
+        required: true 
+        content: 
+          application/json: 
+            schema: 
+              $ref: '#/components/schemas/RefreshTokenRequest' 
+      responses: 
+        '200': 
+          description: Token refreshed successfully 
+          content: 
+            application/json: 
+              schema: 
+                $ref: '#/components/schemas/TokenResponse' 
+        '401': 
+          description: Invalid or expired refresh token 
+ 
+  /books/: 
+    get: 
+      tags: 
+        - books 
+      summary: Get all books 
+      parameters: 
+        - in: query 
+          name: status 
+          schema: 
+            type: string 
+            enum: [available, issued] 
+        - in: query 
+          name: author 
+          schema: 
+            type: string 
+        - in: query 
+          name: sort_by 
+          schema: 
+            type: string 
+            enum: [title, year] 
+        - in: query 
+          name: sort_order 
+          schema: 
+            type: string 
+            enum: [asc, desc] 
+            default: asc 
+        - in: query 
+          name: offset 
+          schema: 
+            type: integer 
+            minimum: 0 
+            default: 0 
+        - in: query 
+          name: limit 
+          schema: 
+            type: integer 
+            minimum: 1 
+            maximum: 100 
+            default: 10 
+      responses: 
+        '200': 
+          description: Successful Response 
+          headers: 
+            X-RateLimit-Limit: 
+              schema: 
+                type: integer 
+            X-RateLimit-Remaining: 
+              schema: 
+                type: integer 
+            X-RateLimit-Reset: 
+              schema: 
+                type: integer 
+          content: 
+            application/json: 
+              schema: 
+                $ref: '#/components/schemas/BookListResponse' 
+        '429': 
+          description: Rate limit exceeded 
+    post: 
+      tags: 
+        - books 
+      summary: Add a new book 
+      security: 
+        - BearerAuth: [] 
+      requestBody: 
+        required: true 
+        content: 
+          application/json: 
+            schema: 
+              $ref: '#/components/schemas/BookCreate' 
+      responses: 
+        '201': 
+          description: Book created successfully 
+          content: 
+            application/json: 
+              schema: 
+                $ref: '#/components/schemas/Book' 
+        '401': 
+          description: Unauthorized 
+ 
+  /books/{book_id}: 
+    get: 
+      tags: 
+        - books 
+      summary: Get a book by ID 
+      parameters: 
+        - in: path 
+          name: book_id 
+          required: true 
+          schema: 
+            type: string 
+      responses: 
+        '200': 
+          description: Successful Response 
+          content: 
+            application/json: 
+              schema: 
+                $ref: '#/components/schemas/Book' 
+        '404': 
+          description: Book not found 
+    delete: 
+      tags: 
+        - books 
+      summary: Delete a book 
+      security: 
+        - BearerAuth: [] 
+      parameters: 
+        - in: path 
+          name: book_id 
+          required: true 
+          schema: 
+            type: string 
+      responses: 
+        '204': 
+          description: Book deleted successfully 
+        '401': 
+          description: Unauthorized 
+ 
+components: 
+  securitySchemes: 
+    BearerAuth: 
+      type: http 
+      scheme: bearer 
+      bearerFormat: JWT 
+      description: JWT token from /auth/login endpoint 
+ 
+  schemas: 
+    BookStatus: 
+      type: string 
+      enum: 
+        - available 
+        - issued 
+      example: available 
+ 
+    BookCreate: 
+      type: object 
+      required: 
+        - title 
+        - author 
+        - status 
+        - year 
+      properties: 
+        title: 
+          type: string 
+          example: "The Lord of the Rings" 
+        author: 
+          type: string 
+          example: "J.R.R. Tolkien" 
+        description: 
+          type: string 
+          example: "An epic high-fantasy novel" 
+        status: 
+          $ref: '#/components/schemas/BookStatus' 
+        year: 
+          type: integer 
+          example: 1954 
+ 
+    Book: 
+      allOf: 
+        - $ref: '#/components/schemas/BookCreate' 
+        - type: object 
+          required: 
+            - id 
+          properties: 
+            id: 
+              type: string 
+              example: "645a7b8e9f1a2b3c4d5e6f7a" 
+ 
+    BookListResponse: 
+      type: object 
+      required: 
+        - items 
+      properties: 
+        items: 
+          type: array 
+          items: 
+            $ref: '#/components/schemas/Book' 
+        next_cursor: 
+          type: string 
+          nullable: true 
+          example: "10" 
+ 
+    SignupRequest: 
+      type: object 
+      required: 
+        - username 
+        - password 
+      properties: 
+        username: 
+          type: string 
+          example: "johndoe123" 
+        password: 
+          type: string 
+          example: "securepass!1" 
+ 
+    SignupResponse: 
+      type: object 
+      required: 
+        - message 
+        - username 
+      properties: 
+        message: 
+          type: string 
+          example: "User registered successfully" 
+        username: 
+          type: string 
+          example: "johndoe123" 
+ 
+    TokenResponse: 
+      type: object 
+      required: 
+        - access_token 
+        - refresh_token 
+      properties: 
+        access_token: 
+          type: string 
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." 
+        refresh_token: 
+          type: string 
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." 
+        token_type: 
+          type: string 
+          default: bearer 
+          example: "bearer" 
+ 
+    RefreshTokenRequest: 
+      type: object 
+      required: 
+        - refresh_token 
+      properties: 
+        refresh_token: 
+          type: string 
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." 
