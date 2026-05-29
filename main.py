@@ -1,12 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Form, Request
+from fastapi import FastAPI, HTTPException, status, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import JSONResponse
 from api.books import router as books_router
 from auth.jwt_service import create_access_token, create_refresh_token, verify_refresh_token, verify_token
 from schemas.auth import TokenResponse, RefreshTokenRequest, LoginRequest
-from dependencies.rate_limiter import check_rate_limit
 from pydantic import BaseModel
 
 # Request schemas for signup
@@ -39,73 +37,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Rate limiting middleware
+# Rate limiting middleware is disabled
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    """Apply rate limiting ONLY to /books and /books/{books_id}"""
-    
-    # Визначаємо, чи підпадає поточний шлях під рейт-ліміт
-    path = request.url.path
-    path_parts = [p for p in path.split("/") if p]
-    
-    is_target_route = False
-    # Перевіряємо: /books (довжина 1) або /books/{books_id} (довжина 2)
-    if len(path_parts) >= 1 and path_parts[0] == "books" and len(path_parts) <= 2:
-        is_target_route = True
-        
-    # Якщо це інший роут (auth, docs, health тощо) — пропускаємо без лімітів
-    if not is_target_route:
-        return await call_next(request)
-    
-    # Extract client identifier
-    client_ip = request.client.host if request.client else "unknown"
-    username = None
-    is_authenticated = False
-    
-    # Try to extract username from Authorization header
-    auth_header = request.headers.get("authorization", "").strip()
-    print(f"DEBUG: Auth header: {auth_header}")
-    
-    if auth_header:
-        parts = auth_header.split()
-        if len(parts) == 2 and parts[0].lower() == "bearer":
-            token = parts[1]
-            print(f"DEBUG: Token found, verifying...")
-            payload = verify_token(token)
-            print(f"DEBUG: Token payload: {payload}")
-            if payload:
-                username = payload.get("sub")
-                is_authenticated = True
-                print(f"DEBUG: User authenticated as: {username}")
-        else:
-            print(f"DEBUG: Invalid auth header format: {auth_header}")
-    
-    # Use username if authenticated, otherwise use IP
-    identifier = username if is_authenticated else client_ip
-    print(f"DEBUG: Rate limit check - identifier: {identifier}, is_authenticated: {is_authenticated}")
-    
-    # Check rate limit
-    allowed, info = await check_rate_limit(identifier, is_authenticated)
-    print(f"DEBUG: Rate limit result - allowed: {allowed}, info: {info}")
-    
-    if not allowed:
-        return JSONResponse(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            content={
-                "detail": "Rate limit exceeded",
-                "limit": info["limit"],
-                "remaining": info["remaining"],
-                "reset_in_seconds": info["reset"]
-            }
-        )
-    
-    # Add rate limit info to response headers
-    response = await call_next(request)
-    response.headers["X-RateLimit-Limit"] = str(info["limit"])
-    response.headers["X-RateLimit-Remaining"] = str(info["remaining"])
-    response.headers["X-RateLimit-Reset"] = str(info["reset"])
-    
-    return response
+    return await call_next(request)
 
 # CORS middleware
 app.add_middleware(
