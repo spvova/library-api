@@ -5,7 +5,6 @@ from schemas.book import BookCreate, Book
 from services.book_service import BookService
 from repository.book_repository import BookRepository
 from database import get_db
-import asyncio
 from typing import List, Optional
 
 class BooksResource(Resource):
@@ -79,19 +78,14 @@ class BooksResource(Resource):
     })
     def get(self):
         args = self.parser.parse_args()
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(self._get_books_async(args))
-            return result
-        finally:
-            loop.close()
-
-    async def _get_books_async(self, args):
-        db = await get_db()
+        
+        # Отримуємо синхронного клієнта бази даних
+        db = get_db()
         repo = BookRepository(db)
         service = BookService(repo)
-        books = await service.get_books(
+        
+        # Викликаємо сервіс синхронно (без await)
+        books = service.get_books(
             status=args['status'],
             author=args['author'],
             sort_by=args['sort_by'],
@@ -99,7 +93,7 @@ class BooksResource(Resource):
             offset=args['offset'],
             limit=args['limit']
         )
-        return [book.model_dump() for book in books], 200
+        return books, 200
 
     @swag_from({
         'tags': ['Books'],
@@ -128,20 +122,12 @@ class BooksResource(Resource):
         except Exception as e:
             return {'message': f'Invalid input: {str(e)}'}, 400
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(self._add_book_async(book_data))
-            return result
-        finally:
-            loop.close()
-
-    async def _add_book_async(self, book_data):
-        db = await get_db()
+        db = get_db()
         repo = BookRepository(db)
         service = BookService(repo)
-        new_book = await service.add_book(book_data.model_dump())
-        return new_book.model_dump(), 201
+        
+        new_book = service.add_book(book_data.model_dump())
+        return new_book, 201
 
 
 class BookResource(Resource):
@@ -167,22 +153,14 @@ class BookResource(Resource):
         }
     })
     def get(self, book_id):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(self._get_book_async(book_id))
-            return result
-        finally:
-            loop.close()
-
-    async def _get_book_async(self, book_id):
-        db = await get_db()
+        db = get_db()
         repo = BookRepository(db)
         service = BookService(repo)
-        book = await service.get_book_by_id(book_id)
+        
+        book = service.get_book_by_id(book_id)
         if not book:
             return {'message': 'Book not found'}, 404
-        return book.model_dump(), 200
+        return book, 200
 
     @swag_from({
         'tags': ['Books'],
@@ -205,19 +183,11 @@ class BookResource(Resource):
         }
     })
     def delete(self, book_id):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(self._delete_book_async(book_id))
-            return result
-        finally:
-            loop.close()
-
-    async def _delete_book_async(self, book_id):
-        db = await get_db()
+        db = get_db()
         repo = BookRepository(db)
         service = BookService(repo)
-        deleted = await service.delete_book(book_id)
+        
+        deleted = service.delete_book(book_id)
         if not deleted:
             return {'message': 'Book not found'}, 404
         return '', 204

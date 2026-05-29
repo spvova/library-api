@@ -1,11 +1,12 @@
+# database.py
+from pymongo import MongoClient
 import os
-from motor.motor_asyncio import AsyncIOMotorClient
 
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://mongo_admin:password@localhost:27017/?authSource=admin")
-MONGODB_DB = os.getenv("MONGODB_DB", "books")
+# Створюється ОДИН раз і безпечно використовується всіма потоками Flask
+mongo_uri = os.getenv("MONGODB_URL", "mongodb://mongo_admin:password@localhost:27017/?authSource=admin")
+client = MongoClient(mongo_uri)
 
-client = AsyncIOMotorClient(MONGODB_URL)
-database = client[MONGODB_DB]
+db = client["library"]
 
-async def get_db():
-    return database
+def get_db():
+    return db

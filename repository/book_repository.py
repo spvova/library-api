@@ -16,7 +16,7 @@ class BookRepository:
             "year": document["year"],
         }
 
-    async def get_books(
+    def get_books(
         self,
         status: Optional[Union[str, BookStatus]] = None,
         author: Optional[str] = None,
@@ -41,32 +41,36 @@ class BookRepository:
             sort_field = '_id'
 
         sort_direction = 1 if sort_order == 'asc' else -1
+        
+        # pymongo відразу повертає курсор, який можна ітерувати
         cursor = self.collection.find(query).sort(sort_field, sort_direction).skip(offset).limit(limit)
-        documents = await cursor.to_list(length=limit)
-        return [self._serialize(document) for document in documents]
+        return [self._serialize(document) for document in cursor]
 
-    async def get_book_by_id(self, book_id: str) -> Optional[dict]:
+    def get_book_by_id(self, book_id: str) -> Optional[dict]:
         try:
             oid = ObjectId(book_id)
         except Exception:
             return None
 
-        document = await self.collection.find_one({"_id": oid})
+        # Без await
+        document = self.collection.find_one({"_id": oid})
         return self._serialize(document) if document else None
 
-    async def add_book(self, book_data: dict) -> dict:
+    def add_book(self, book_data: dict) -> dict:
         if 'status' in book_data and isinstance(book_data['status'], BookStatus):
             book_data['status'] = book_data['status'].value
 
-        result = await self.collection.insert_one(book_data)
-        document = await self.collection.find_one({"_id": result.inserted_id})
+        # Без await
+        result = self.collection.insert_one(book_data)
+        document = self.collection.find_one({"_id": result.inserted_id})
         return self._serialize(document)
 
-    async def delete_book(self, book_id: str) -> bool:
+    def delete_book(self, book_id: str) -> bool:
         try:
             oid = ObjectId(book_id)
         except Exception:
             return False
 
-        response = await self.collection.delete_one({"_id": oid})
+        # Без await
+        response = self.collection.delete_one({"_id": oid})
         return response.deleted_count > 0

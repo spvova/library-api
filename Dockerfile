@@ -8,10 +8,9 @@ COPY pyproject.toml uv.lock ./
 
 RUN uv sync --frozen --no-dev
 
-ENV PATH="/app/.venv/bin:$PATH"
-
 COPY . .
 
-EXPOSE 5000
+ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["python", "main.py"]
+# Тепер Docker знатиме, де шукати flask або python
+CMD ["flask", "--app", "main.py", "run", "--host=0.0.0.0"]
